@@ -1,11 +1,16 @@
 package Regexp::Tr;
 
+### IMPORTS
+# Boilerplate package beginning
 use 5.008;
 use strict;
 use warnings;
 use Carp;
 
-our $VERSION = "0.03";
+### PACKAGE VARIABLES
+
+# UNIVERSAL package variables
+our $VERSION = "0.04";
 
 # The following hash contains caller package names
 # as keys and arrayrefs as values.  These arrayrefs
@@ -19,7 +24,7 @@ my %last;
 our @_called;
 
 # This method creates a new instance of the object
-sub new($$$;$) {
+sub new {
     # Get parameters and suppress warnings
     my($class,$from,$to,$mods) = @_;
     $from = "" unless(defined($from));
@@ -50,7 +55,7 @@ sub new($$$;$) {
 }
 
 # Performs the actual tr/// operation set up by the object.
-sub bind($$) {
+sub bind {
     my $self = shift;
 
     # Verify reference passed
@@ -68,16 +73,17 @@ sub bind($$) {
 }
 
 # Performs the tr/// operation on a scalar passed to the object.
-sub trans($$) {
+sub trans {
     my($self,$val) = @_;
     my $cnt = $self->bind(\$val);
     return wantarray ? ($val, $cnt) : $val;
 }
 
 # Flushes the efficiency storage
-sub flush($) {
+sub flush {
     %last = ();
     @_called = ();
+    return;
 }
 
 return 1;
@@ -154,6 +160,7 @@ string and the tr/// return value in list context.
 
 Flushes the efficiency cache, potentially gaining some memory back 
 but forcing the next object to be created entirely from scratch.
+Returns void.
 
 =head1 SEE ALSO
 
@@ -172,6 +179,7 @@ Provides more information on the operator.
 =head1 AUTHOR
 
 Robert Fischer, E<lt>chia@cpan.orgE<gt>
+Hamline University, class of 2004.
 
 =head1 COPYRIGHT AND LICENSE
 

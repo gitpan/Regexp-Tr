@@ -10,7 +10,7 @@ use Carp;
 ### PACKAGE VARIABLES
 
 # UNIVERSAL package variables
-our $VERSION = "0.04";
+our $VERSION = "0.05";
 
 # The following hash contains caller package names
 # as keys and arrayrefs as values.  These arrayrefs
@@ -60,12 +60,13 @@ sub bind {
 
     # Verify reference passed
     (my $ref = shift) 
-	or carp "No reference passed to Regex::Tr object";
+	or carp "No reference passed";
     my $reftype = ref($ref);
     if(!$reftype) {
-	carp "Parameter to Regex::Tr object not a reference.\nYou might have forgotten to backslash the scalar";
+	carp "Parameter is not a reference.\n"
+	    ."You might have forgotten to backslash the scalar";
     } elsif($reftype ne "SCALAR") {
-	carp "Parameter to Regex::Tr object not a scalar reference";
+	carp "Parameter not a scalar reference";
     }
 
     # Perform the operation

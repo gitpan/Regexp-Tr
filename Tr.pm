@@ -5,30 +5,38 @@ use strict;
 use warnings;
 use Carp;
 
-# The default string for the initial value
-use constant DEF_STRING => " ";
+our $VERSION = "0.03";
 
-our $VERSION = "0.02";
+# The following hash contains caller package names
+# as keys and arrayrefs as values.  These arrayrefs
+# begin with the parameters passed, and end with the
+# object (therefore, $last{pkg}[-1] is the last object
+# created for the namespace "pkg".
+my %last;
 
-# @last will consist of the parameters forming
-# the last object created by this class, and 
-# element index -1 will be that object.
-my @last;
+# This is a scratch opening in the symbol table and 
+# IS NOT GUARANTEED TO BE ANYTHING AT ALL. 
+our @_called;
 
 # This method creates a new instance of the object
 sub new($$$;$) {
+    # Get parameters and suppress warnings
     my($class,$from,$to,$mods) = @_;
-
-    # Supress warnings
     $from = "" unless(defined($from));
     $to   = "" unless(defined($to));
     $mods = "" unless(defined($mods));
-    
-    # Efficiency kludge for loops
-    unless(scalar(@last) and 
-	   ($from eq $last[0]) and
-	   ($to   eq $last[1]) and
-	   ($mods eq $last[2]) ) 
+
+    # Name (or make) the anonymous array in the
+    # %last hash for the caller's package.
+    # (The typeglob assignment saves a hash 
+    # access each time @_called is...well, called.)
+    *_called = ($last{caller()} ||= []);
+
+    # Work the efficiency for loops
+    unless(scalar(@_called) and 
+	   ($from eq $_called[0]) and
+	   ($to   eq $_called[1]) and
+	   ($mods eq $_called[2]) ) 
     {
 	my $subref = eval '
 	sub(\$) {
@@ -36,14 +44,16 @@ sub new($$$;$) {
 	    return ${$ref} =~ tr/'.$from.'/'.$to.'/'.$mods.';
 	};';
 	carp 'Bad tr///:'.$@ if $@;
-	@last = ($from,$to,$mods,bless($subref,$class));
+	@_called = ($from,$to,$mods,bless($subref,$class));
     }
-    return $last[-1];
+    return $_called[-1];
 }
 
 # Performs the actual tr/// operation set up by the object.
 sub bind($$) {
     my $self = shift;
+
+    # Verify reference passed
     (my $ref = shift) 
 	or carp "No reference passed to Regex::Tr object";
     my $reftype = ref($ref);
@@ -52,6 +62,8 @@ sub bind($$) {
     } elsif($reftype ne "SCALAR") {
 	carp "Parameter to Regex::Tr object not a scalar reference";
     }
+
+    # Perform the operation
     return &{$self}($ref);
 }
 
@@ -60,6 +72,12 @@ sub trans($$) {
     my($self,$val) = @_;
     my $cnt = $self->bind(\$val);
     return wantarray ? ($val, $cnt) : $val;
+}
+
+# Flushes the efficiency storage
+sub flush($) {
+    %last = ();
+    @_called = ();
 }
 
 return 1;
@@ -77,6 +95,7 @@ Regexp::Tr - Run-time-compiled tr/// objects.
   my $swapped = "foobar";
   $trier->bind(\$swapped);               # $swapped is now "ullyzi"
   my $tred = $trier->trans("barfoo");    # $tred is "yziull"
+  Regexp::Tr->flush();                   # Cache is gone!
 
 =head1 ABSTRACT
 
@@ -93,17 +112,30 @@ been to put an eval around any dynamic tr/// operations, but that is
 very expensive to be used often (for instance, within a loop).  This 
 module solves that problem by compiling the tr/// a single time and 
 allowing the user to use it repeatedly and delete it when it it no 
-longer useful.  The last instance to be created is stored for ease of 
-recreation (for instance, within a loop).
+longer useful.  
+
+=head2 User Efficiency Notes
+
+The last instance created is stored for efficient recreation.  This is 
+useful for repeated iterations over the same code (for instance, 
+within a loop).  The last instance created is stored seperately for 
+every package which uses this module, so multiple packages relying on 
+this ability can still gain the speed benefit.
+
+This cache may be emptied may be regained at any time by calling the 
+class method CLASS->flush().  All objects will continue to function, 
+but the internal cache will be emptied.  This is probably not worth it
+unless there are many different namespaces using this package or the
+program is very memory-sensitive.
 
 =head1 METHODS
 
 =head2 CLASS->new(FROMSTRING,TOSTRING,[MODIFIERS])
 
 This creates a new instance of this object.  FROMSTRING is the 
-precursor string for the tr///, TOSTRING is the succsessor string for 
-the tr///, and the optional MODIFIERS is a string containing any 
-modifiers to the tr/// (eg: "e", etc.).
+precursor string for the tr/// (eg: "a-z"), TOSTRING is the succsessor 
+string for the tr/// (eg: "bac-z"), and the optional MODIFIERS is a 
+string containing any modifiers to the tr/// (eg: "e", etc.).
 
 =head2 $obj->bind(SCALARREF)
 
@@ -118,13 +150,23 @@ This takes a scalar, performs the tr/// operation, and returns the
 tr///ed string in scalar context, or a list consisting of the tr///ed 
 string and the tr/// return value in list context.
 
+=head2 CLASS->flush()
+
+Flushes the efficiency cache, potentially gaining some memory back 
+but forcing the next object to be created entirely from scratch.
+
 =head1 SEE ALSO
 
 =over
+
 =item L<perlop>
+
 Provides a definition of the tr/// operator.
+
 =item L<perlre>
+
 Provides more information on the operator.
+
 =back
     
 =head1 AUTHOR
